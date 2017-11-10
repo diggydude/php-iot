@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#             An Internet of Things (IoT) Framework in PHP
+#
+#                    Copyright 2017 James Elkins
+#
+# This software is released under the Pay It Forward License (PIFL) with
+# neither express nor implied warranty as regards merchantablity or fitness
+# for any particular use. The end user assumes responsibility for all
+# consequences arising from the use of this software.
+#
+# Use of this software in whole or in in part for any commercial purpose,
+# including use in undistributed in-house applications, obligates the user
+# to "Pay It Forward" by contributing monetarily or in kind to such open
+# source software and/or hardware project(s) as the user may choose.
+#
+# This software may be freely copied and distributed as long as said copies
+# are accompanied by this copyright notice and licensing agreement. This
+# document shall cosntitute the entirety of the agreement between the
+# software's author and the end user.
+
+PHP=/usr/bin/php
+CLIENT=/mnt/HDD0/shares/code/php-iot/php-iot/clients/terminal.php
+LOG=/mnt/HDD0/shares/log/m100.log
+
+nohup $PHP $CLIENT -n m100 -h 127.0.0.1 -p 88090 -d /dev/ttyUSB2 -b 1200 > $LOG &

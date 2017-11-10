@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="Author" content="James Elkins <jselkins@yahoo.com>">
+  <meta name="Keywords" content="arduino,php,socket,client,server,serial,rs-232,terminal,robotics,electronics,digital,analog,pwm,servo,port,trs-80,color computer">
+  <meta name="Description" content="An Internet of Things (IoT) Framework in PHP">
+  <title>An Internet of Things (IoT) Framework in PHP</title>
+  <style type="text/css">
+   body {
+     font-family:      sans-serif;
+	 color:            #000077;
+	 background-color: #ffffcc;
+	 margin:           50px 20% 100px 20%;
+   }
+   a {
+     color: blue;
+   }
+   figure {
+	 color:            #ffffcc;
+	 background-color: #000077;
+   }
+   figcaption {
+     font-size:        10pt;
+	 padding:          10px;
+   }
+   .cli {
+     white-space:      pre;
+     font-family:      monospace;
+	 color:            green;
+	 font-weight:      bold;
+	 background-color: black;
+	 padding:          20px;
+	 border-radius:    20px;
+  </style>
+ </head>
+ <body>
+  <h1>An Internet of Things (IoT) Framework in PHP</h1>
+  <h2>Overview</h2>
+  <p>This project will demonstrate a distributed IoT application using one or more single-board computers (SBCs)
+     and one or more microcontroller (MCU) development boards. It can be adapted to any combination of SBCs and
+	 MCUs. This demonstration will use a Raspberry Pi 3, two C.H.I.P.s, and an Arduino Nano. The SBCs mentioned
+	 all have onboard WiFi, allowing your projects to be mobile.
+  </p>
+  <p>All PHP scripts and Arduino libraries and sketches used in this project are available for download. I
+     recommend examining each file as it is mentioned in this article in order to gain a clear understanding of
+	 how each piece works. The demo project is a rather complex one, designed to fully demonstrate the power and
+	 versatility of the framework. You'll soon learn how it can serve as a foundation for all kinds of networked
+	 electronics projects, large and small, with a minimum of effort.
+  </p>
+  <p>You can <a href="php-iot.zip">download the PHP
+     IoT framework here</a>. All required third-party files are linked to below.
+  </p>
+  <p>The framework consists of a number of serial communication adapters and socket servers and clients combined
+     in various ways. These will enable you to control multiple MCU-based hardware projects (herein referred to as
+	 "Droids") from the command line or from a vintage serial terminal or home computer. We will demonstrate the
+	 latter using a TRS-80 Model 100 laptop and a Color Computer 2 with the Deluxe RS-232 Pak. You can also
+	 automate your projects using the provided script engine. All of these things are accomplished using a simple,
+	 user-friendly command-and-response protocol.
+  </p>
+  <p><i>This article assumes you're familiar with Linux and PHP programming and have some experience building electronic
+      projects with Arduino. I cannot answer questions that have been covered elsewhere, so please review all of
+	  the material linked to below and spend some time experimenting with these concepts before you build.</i>
+  </p>
+  <h2>PHP Classes</h2>
+  <p>As mentioned above, the PHP software consists of serial adapters and TCP socket servers and clients. The
+     abstract <code>SocketServer</code> and <code>SocketClient</code> classes are extended to create the specific
+     modules needed for network communications. Extending these base classes is largely a matter of implementing
+	 event handlers: methods that respond to connects, disconnects, errors, and incoming data. Several
+	 frequently-used concrete classes are provided:
+  </p>
+  <ul>
+    <li><code>SocketClient</code>
+	  <ul>
+	    <li><code>Shell</code> &mdash; for issuing commands from the command line</li>
+		<li><code>Terminal</code> &mdash; for issuing commands from a serial terminal</li>
+		<li><code>Port</code> &mdash; for issuing commands from your own PHP scripts</li>
+	  </ul>
+	</li>
+	<li><code>SocketServer</code>
+	  <ul>
+	    <li><code>Gateway</code> &mdash; routes any client on the network to any endpoint server on the network</li>
+		<li><code>EchoServer</code> &mdash; demo endpoint server that simply echoes commands back to the client</li>
+		<li><code>SignalIoServer</code> &mdash; endpoint server that controls our example project or Droid</li>
+      </ul>
+    </li>
+  </ul>
+  <p>The <code>Serial</code> and <code>Port</code> classes are used by other modules and scripts to create
+     serial and TCP connections, respectively.
+  </p>
+  <p>The <code>ScriptEngine</code> class reads a list of commands from a file and sends them out over the network
+     one-by-one through a <code>Port</code> adapter. Responses to all of the commands in a script are returned in
+	 an array.
+  </p>
+  <p>The <code>Droid</code> class encapsulates the operations of an MCU-based project. It enables sending commands
+     to a MCU over a <code>Serial</code> adapter. The <code>SignalIoDroid</code> class extends <code>Droid</code> to
+	 implement all of the commands recognized by our Signal IO Droid project.
+  </p>
+  <p>To better understand PHP socket programming, consult the
+     <a href="http://php.net/manual/en/ref.sockets.php" target="_blank">Socket Functions</a>
+     section of the PHP Manual, paying attention to the user notes therein.
+  </p>
+  <p>We'll also be using the
+     <a href="https://github.com/zf1/zend-console-getopt/blob/master/library/Zend/Console/Getopt.php" target="_blank">Getopt class</a>
+     from Zend Framework. We don't need the whole Zend Framework, so just download the one class file and copy it to
+     the IoT framework's <code>php/vnd</code> folder.
+  </p>
+  <p>At this point, it should be apparent that any module can be hosted on any SBC on the network, allowing for
+     tremendous architectural flexibility in your application.
+  </p>
+  <h2>Arduino Libraries</h2>
+  <p>A number of third-party Arduino libraries are required for the demo project. I recommend following the original
+     authors' instructions to install these libraries in your Arduino IDE. It would be a good idea to read the tutorial
+	 accompanying each library to gain a clear understanding of how the various hardware devices and code work, as I
+	 won't spend too much time repeating what has already been written.
+  </p>
+  <ul>
+	<li><a href="https://playground.arduino.cc/Code/Messenger" target="_blank">Arduino Playground - Messenger</a> (Ignore the message in red and use the download link further down the page.)</li>
+    <li><a href="https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout?view=all" target="_blank">Adafruit TCA9548A 1-to-8 I2C Multiplexer Breakout</a></li>
+    <li><a href="https://github.com/etherkit/Si5351Arduino" target="_blank">Etherkit Si5351Arduino</a></li>
+    <li><a href="https://learn.adafruit.com/adafruit-4-channel-adc-breakouts?view=all" target="_blank">Adafruit 4-Channel ADC Breakouts</a></li>
+    <li><a href="https://learn.adafruit.com/mcp4725-12-bit-dac-tutorial?view=all" target="_blank">Adafruit MCP4725 12-Bit DAC Tutorial</a></li>
+    <li><a href="https://learn.adafruit.com/16-channel-pwm-servo-driver?view=all" target="_blank">Adafruit 16-Channel Servo Driver with Arduino</a></li>
+	<li><a href="https://github.com/umarsear/Arduino-AD9851-DDS-Direct-Digital-synthesizer-Signal-Generator/blob/master/dds.ino">Arduino-AD9851-DDS-Direct-Digital-synthesizer-Signal-Generator</a></li>
+  </ul>
+  <p>The first item, the Messenger library, is bundled with an application that we won't be using. Drill down to the
+     subfolder <code>Messenger/messenger/firmware/Messenger</code> and copy it to your Arduino libraries folder. Then add
+     the following lines to <code>Messenger.h</code> and <code>Messenger.cpp</code>. This will enable the Messenger class
+     to read <code>unsigned long</code> numerical strings from the serial port.
+  </p>
+  <p>Messenger.h, line 23:</p>
+  <div class="cli">
+unsigned long readUL();
+  </div>
+
+  <p>Messenger.cpp, line 68 - 75:</p>
+  <div class="cli">
+unsigned long Messenger::readUL()
+{
+  if (next()) {
+    dumped = 1;
+    return strtoul(current, NULL, 0);
+  }
+  return 0;
+}
+  </div>
+  <p>The last item, the DDS function generator code, is not a library <i>per se</i>, but rather a set of functions that will
+     automatically be included in the <code>SignalIO.ino</code> sketch when placed in the same folder as the latter.
+  </p>
+  <p>In addition to the foregoing, read John Boxall's excellent
+     <a href="http://tronixstuff.com/2011/08/26/tutorial-maximising-your-arduinos-io-ports/" target="_blank">tutorial</a>
+     on using the MCP23017 dual port expander IC with Arduino. (As a matter of fact, the Arduino novice wishing to expand his skills
+     should read all of his tutorials.) The code to control the port expanders is included in our Signal IO sketch, so it doesn't
+     require an additional library.
+  </p>
+  <h2>Hardware</h2>
+  <p>The Signal IO Droid consists of an Arduino Nano controlling several I<sup>2</sup>C chips and breakout boards,
+     and a DDS waveform synthesizer breakout board. All of these components are available on Ebay or from an
+	 electronic hobby supplier such as Adafruit. The Ebay knockoffs tend to be cheaper, but you'll typically
+	 have to wait several weeks for them to arrive from overseas. Plan accordingly.
+  </p>
+  <p><i>Not to shill for commercial vendors or anything, but they have invested the lion's share of time and money in
+     creating the hardware and firmware used here. Please support open source hardware by purchasing at least a few of
+	 the components from a vendor such as Arduino, Adafruit, Sparkfun, or Freetronix.</i>
+  </p>
+  <p>You should have a good assortment of resistors, capacitors, linear voltage regulators, 22-gauge solid hookup wire,
+     stripboard, and male and female headers and Dupont cables on hand to complete the project. (If
+	 you're attempting to build this project, you're most likely an experienced builder with a well-stocked lab, but I
+	 thought I'd mention it anyway.)
+  </p>
+  <p>If you intend to use a serial terminal, you'll need a terminal (or home computer with an RS-232 adapter and
+     terminal software), an FTDI cable, a null modem cable, and possibly a DB-25 to DE-9 adapter depending on which
+	 connectors your terminal and cables have. It's not necessary to use a terminal with the framework. You can run
+	 the shell client script from the Linux command line or an <code>ssh</code> client such as PuTTY. I included the
+	 terminal software because it's fun finding new uses for old computers and new <code>Serial</code> adapters.
+  </p>
+  <h3>Layout</h3>
+    <p><i>Main Board</i> &mdash; Contains the <a href="https://www.arduino.cc/en/Guide/ArduinoNano">Arduino Nano</a>,
+       four <a href="http://ww1.microchip.com/downloads/en/DeviceDoc/21952b.pdf">MCP23017</a> dual port expander ICs,
+       an <a href="https://www.silabs.com/Support%20Documents/TechnicalDocs/Si5351-B.pdf">Si5351</a> three-channel
+       clock generator, an <a href="http://www.analog.com/media/en/technical-documentation/data-sheets/AD9850.pdf">AD9850</a>
+       function generator, a socket for a <a href="http://www.mouser.com/ds/2/302/PCA9685-842230.pdf">PCA9685</a>
+       16-channel 12-bit  PWM/servo driver card, +5VDC and +/-15VDC power connections, and I<sup>2</sup>C bus/power
+       connections.
+    </p>
+    <p><i>DAC Board</i> &mdash; Contains sixteen <a href="http://ww1.microchip.com/downloads/en/DeviceDoc/22039d.pdf">MCP4725</a>
+	   breakouts, multiplexed by two
+	   <a href="https://cdn-learn.adafruit.com/downloads/pdf/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout.pdf" target="_blank">TCA9548A</a>
+	   breakouts.
+    </p>
+    <p><i>ADC Board</i> &mdash; Contains four <a href="http://www.ti.com/lit/ds/symlink/ads1115.pdf">ADS1115</a>
+       breakouts for a total of 16 analog-to-digital converter channels. Each channel is enhanced with input
+	   over-current and over-voltage protection, and a switchable unbiased positive clamp circuit to keep signals
+	   safely in the 0 to +5VDC range. ADCs are easy to fry. We're going the extra mile to make sure we don't do it.
+    </p>
+  <h2>Rationale</h2>
+  <p>As you may have guessed, our Signal IO Droid will provide a staggering number of digital and analog inputs and
+     outputs. Here's what we get:
+  </p>
+  <ul>
+    <li>Eight 8-bit IO ports, or 64 independent GPIO pins</li>
+	<li>Sixteen analog-to-digital converters (ADCs)</li>
+	<li>Sixteen digital-to-analog converters (DACs)</li>
+	<li>Sixteen PWM servo controllers</li>
+	<li>Three digital clock generators</li>
+	<li>A direct digital synthesis (DDS) waveform generator</li>
+  </ul>
+  <p>Some readers may wonder why anyone would build such a monstrosity. The answer is simple. Some combination of
+     these signals is used to interface with practically every chip or device known to man, whether vintage, modern,
+	 electrical, electronic, or electromagnetic. Here is but a mere sample of the kinds of projects we can
+	 build around the Signal IO Droid:
+  </p>
+  <ul>
+    <li>Robots (motor and relay control, sensor arrays, etc.)</li>
+	<li>Old school voltage-controlled synthesizers</li>
+	<li>Chiptune instruments (Commodore SID, Atari POKEY, etc.)</li>
+  </ul>
+  <p>This one project can serve as the foundation for practically any kind of IoT project you can dream up.
+     Instead of building out the infrastructure for each project separately, as many online tutorials demostrate, you
+	 can build a general-purpose infrastructure once and reuse it in all of your projects. Or you can use the Signal IO
+	 Droid to quickly test your designs before committing to an expensive and potentially faulty build. Or you can just
+	 experiment with devices on a breadboard without building an end product. As you can see, the slightly complicated
+	 initial build process really pays off. You'll have a Swiss army knife of signal interfacing at your command.
+  </p>
+  <p>Another practical advantage of using the IoT framework is that you can pre-process MCU commands and constrain, scale,
+     validate, or translate parameters before sending them to the MCU, thereby offloading some of the command interpreter
+	 work onto an SBC having more memory and processing power than the MCU. This gives the command protocol enough
+	 sophistication to be robust and user-friendly without sacrificing precious MCU resources. The included
+	 <code>SignalIoDroid</code> and <code>SignalIoServer</code> classes illustrate this concept.
+  </p>
+  <p>Of course, you can use fewer or more of each component if desired, up to the limit specified in each device's
+     documentation. The parts count used in our example implementation is good for most projects. Using more I<sup>2</sup>C
+	 devices could exceed the limits of the I<sup>2</sup>C bus. You could run out of IO connections if you use fewer. Find
+	 a trade-off that's right for you.
+  </p>
+  <h2>Theory of Operation</h2>
+  <p>A client (e.g., a <code>Shell</code>, <code>Terminal</code>, <code>Port</code>, or <code>ScriptEngine</code>) connects
+     to the <code>Gateway</code> and issues commands to it and to endpoint Droid servers. The client may recognize a few
+	 special responses that are handled differently from the normal responses received from the <code>SignalIoDroid</code>
+	 or other Droid. These are:
+  </p>
+  <ul>
+    <li><code>#PROMPT promptText</code> &mdash; set the terminal or shell prompt to the specified text</li>
+	<li><code>#ERROR  errorMessage</code> &mdash; indicates that the previous command caused an error</li>
+  </ul>
+  <p>All clients connect only to the <code>Gateway</code> server, which serves as a home base for a network of Droids.
+     It recognizes a few special navigation commands:</p>
+  <ul>
+    <li><code>GO serverName</code> &mdash; routes the client connection to the specified endpoint server.</li>
+    <li><code>MENU</code> &mdash; prints a list of endpoint servers you can <code>GO</code> to via the gateway.</li>
+	<li><code>QUIT</code> &mdash; If the client is currently routed to an endpoint server, route it back to
+	    the gateway server. This is similar to navigating to the home screen or main menu in other applications.
+		If the client is already "at home," disconnect the client from the network.</li>
+  </ul>
+  <p>Responses from the <code>Gateway</code> and endpoint servers are routed back to the client. Here's a sample session:
+  </p>
+  <div class="cli">
+$ php shell.php
+gateway&gt; go echobot
+echobot&gt; foo
+Received: foo
+echobot&gt; bar
+Received: bar
+echobot&gt; quit
+gateway&gt; quit
+Disconnected.
+$
+  </div>
+  <p>Droid servers translate human-friendly commands into <code>Droid</code> method calls. In that respect, a Droid server
+     is rather like a controller in a model-view-controller (MVC) application. The Droid classes in turn generate very
+	 short command strings that an MCU, with its limited program memory, can parse and execute, and send those command
+	 strings to the MCU over a serial connection.
+  </p>
+  <p>All of the clients and servers in your application can be hosted on one SBC, or spread out across multiple SBCs in
+     any combination to achieve a desired load balance thusly:
+  </p>
+  <ul>
+    <li>Set the IP and port number of the Gateway server in all client scripts</li>
+	<li>Set the IPs and port numbers of all endpoint servers in the Gateway server script</li>
+  </ul>
+  <h2>Tips for Builders</h2>
+  <p>Here are a few choice tidbits I've picked up in the course of experimentation that will save you some
+     time and frustration:
+  </p>
+  <ul>
+    <li>Use female headers to make sockets on your circuit boards. Solder straight or right-angle pin headers onto
+	    breakout boards so you can plug them into the sockets on the main board(s).
+		<ul>
+		  <li>For breakouts with one row of pins, use a right-angle header so the breakout will fit perpendicular to
+              the main board, to free up board space for other components.</li>
+		  <li>For breakouts with two or more rows of pins, you'll need to use the same number of female header rows for
+		      the socket, and mount the breakout parallel to the main board, as shown in the photos.</li>
+        </ul>
+	</li>
+	<li>For easy interconnections between boards, provide a header pin on your circuit boards for each signal input and
+	    output. Add some extra pins for distributing power from the main board to other boards.</li>
+    <li>Use four adjacent traces on your stripboard to make an I<sup>2</sup>C connector bus running the length of the board.
+	    (These are for ground, 5VDC, SDA, and SCL).</li>
+    <li>Place a 10&micro;F electrolytic capacitor between the ground and reset pins on the Arduino. Unless you do this,
+	    the Arduino will reset each time a serial connection is made to it, resulting in up to a 10-second delay before
+		the sketch responds to the first command &mdash; or no response at all. Very annoying!</li>
+	<li>Don't try to create a WebSocket server by extending <code>SocketServer</code>. Implementing the WebSocket
+	    protocol would require extensive modification of <code>SocketServer</code> itself, which in turn might
+		necessitate modifying all of its child classes. These classes are intended to help you do a few things very
+		well and very easily. Keep it simple! You'd be better off using one of the popular PHP WebSocket server
+		classes on the Web as a starting point. The techniques learned from studying this framework should help make
+		it a fairly painless proposition to adapt one of them. I may include a WebSocket server in a future release,
+		but it'll be a good while before I get to it. If you write one in the meantime, be sure to let me know!</li>
+	<li>If possible, store all of your code on an external USB hard drive instead of relying on the SBC's flash
+	    media. If you're really paranoid about data loss, do a nightly <code>rsync</code> backup to a second drive. A
+		good strategy would be to keep your code in a shared Samba folder for development and distribute it to your other
+		SBCs from there.</li>
+    <li>Use the <code>EchoServer</code> to troubleshoot networking issues. It's a standalone TCP server, so you don't
+	    need to build any hardware to use it.</li>
+	<li>To test a Droid in isolation from the networking components, write test scripts that call the Droid's methods
+	    directly. This is also a good way to gain some extra speed in your programs, as it bypasses the Droid server's
+		command pre-processing.</li>
+    <li>Put a voltage regulator circuit on the main board, and use it to supply power from an external power source to
+	    all of the Droid components, including the Arduino. Use an external DC power supply that provides enough current
+		for your circuit. Trying to run a project this big on USB power is not a good idea unless you have a really
+		good powered hub. (Hint: Most hubs under $40 US aren't good enough.)</li>
+  </ul>
+  <p><i>If you do need a good USB hub for whatever reason, I highly recommend the HooToo HT-UH010. It supplies
+     ample current for practically any device, with no dropouts or disconnects except under extremely rare,
+	 punishing conditions. We won't come close to pushing its limits with any of our IoT projects.</i>
+  </p>
+  <h2>Build the Circuits</h2>
+  <p>Having dutifully read all of the literature presented above and examined all the schematics, datasheets, and
+     Fritzing layouts therein, you now know:
+  </p>
+  <ul>
+    <li>how to write a simple command interpreter for Arduino using the Messenger library.</li>
+    <li>how to connect the port expanders, ADCs, DACs, servo controller, and clock generator to the Arduino's
+	    I<sup>2</sup>C bus, and how to program them.</li>
+	<li>the I<sup>2</sup>C bus address range allotted for each device, and, consequently, the maximum number
+	    of each device that can be placed on the bus.</li>
+    <li>that we can't use sixteen of the DAC breakouts on the same I<sup>2</sup>C bus, necessitating the use of
+	    two I<sup>2</sup>C multiplexers to switch among them.</li>
+	<li>that the waveform generator isn't an I<sup>2</sup>C device, and must be controlled with four of the
+	    Arduino's digital IO pins.</li>
+  </ul>
+  <p>As we discussed earlier, it's up to you how many or how few of the IO features to include in your build.
+     Here, I can only offer a few photos of my own build to provide ideas and inspiration. Click the photos 
+	 for a larger view.
+  </p>
+  <figure>
+    <a href="./sigio_main_board.jpg" target="_blank"><img style="width: 100%;" src="./sigio_main_board_thumb.jpg" alt="Signal IO Droid main board" /></a>
+	<figcaption>The Signal IO Droid's main board with (left to right) waveform generator, clock generator, Arduino, and four port expander chips
+	mounted.</figcaption>
+  </figure>
+  <p>The servo controller breakout plugs into a socket above the waveform generator.
+  </p>
+  <figure>
+    <a href="./sigio_dac_board.jpg" target="_blank"><img style="width: 100%;" src="./sigio_dac_board_thumb.jpg" alt="Signal IO Droid DAC board" /></a>
+    <figcaption>The Signal IO Droid's DAC board with sixteen DAC breakouts and two I<sup>2</sup>C multiplexer breakouts.</figcaption>
+  </figure>
+  <p>I haven't built the ADC board yet. I plan to put a clamp circuit on each of the sixteen inputs to keep everything in the
+     0 - 5V range.
+  </p>
+  <h2>Setup</h2>
+  <ul>
+    <li>Install PHP 5 on each SBC that will host application components.</li>
+	<li>Install memcached on at least one host.</li>
+	<li>Deploy the IoT framework on each of the PHP hosts. Simply unzip the package wherever you want to put
+	    it.</li>
+	<li>Identify the filenames of your terminal and Droid serial adapters. They'll look something like
+	    <code>/dev/ttyUSB*</code> or <code>/dev/cu.usbmodem*</code>. Connecting the USB devices one at a time and
+		noting what new filename appears in <code>/dev</code> will make this easier. The provided Droid scan
+		function can help you find the filename associated with each Droid's ID once you figure out the naming
+		convention.</li>
+	<li>Configure the client, gateway, and server scripts:
+	    <ul>
+		  <li>Servers should listen on 127.0.0.1.</li>
+		  <li>Clients should connect to the gateway's network IP address (starts with "192.168.2.") if they're not on the
+		  same host as the gateway.</li>
+		  <li>Gateway routing ports should connect to the network IPs of their respective endpoint servers unless they're
+		  on the same host.</li>
+		</ul>
+	</li>
+	<li>To make the application accessible from outside your WiFi network, consult your router's
+		documentation regarding port forwarding and:
+		<ul>
+		  <li>Enter the gateway server's network IP (starts with "192.168.2.") and port number in the router's control panel.</li>
+		  <li>Install the IoT framework on the remote computer.</li>
+		  <li>Configure a client script on the remote computer to connect to your outside IP (the one assigned by your ISP)
+		      and the forwarded port number.</li>
+		</ul>
+	</li>
+	<li>Compile and upload the sketch <code>SignalIO.ino</code> to the Arduino. You can change the ID string to something
+	    that better suits your Droid's purpose. Make a backup copy before you change anything else.</li>
+	<li>Insert the Arduino into the socket you made for it on your Droid board.</li>
+	<li>Power up the Droid and connect it to a USB port on the SBC hosting the <code>SignalIoServer</code>.</li>
+	<li>Critically, you'll want to
+	    <a href="https://learn.adafruit.com/16-channel-pwm-servo-driver/using-the-adafruit-library">calibrate the servo controller
+       stop positions</a> in the Droid firmware before use, to avoid pegging your servos and potentially
+	   damaging them.</li>
+	<li>Start the programs in the following order: endpoint servers, then the gateway server, then the client scripts.</li>
+  </ul>
+  <p>At this point, the system should be ready to accept commands. To take down the system, stop the
+     programs in reverse order.
+  </p>
+  <h2>Signal IO Droid Commands</h2>
+    <p>When response data is expected from a command, it will be sent back to the client. Otherwise, one of these messages
+	   will be sent:
+	</p>
+	<ul>
+	  <li><code>OK</code> &mdash; The command succeeded.</li>
+	  <li><code>#ERROR errorMessage</code> &mdash; The command failed.</li>
+	</ul>
+    <p><code>ID?</code></p>
+	<p>fetches the ID string stored in the Droid's firmware. This helps you use the Droid scanner to match Droid IDs
+	   with serial adapter filenames when it comes time to configure the Droid.
+	</p>
+    <p><code>PORT n SET PIN MODE p m</code></p>
+    <p>where <code>n</code> is the port number 0 - 7, <code>p</code> is the pin number 0 - 7, 
+       and <code>m</code> is the pin mode <code>INPUT</code> or <code>OUTPUT</code>.
+    </p>
+	<p><code>PORT n GET PIN MODE p</code></p>
+    <p>where <code>n</code> is the port number 0 - 7 and <code>p</code> is the pin number 0 - 7.</code>
+	</p>
+    <p><code>PORT n SET PIN p l</code></p>
+    <p>where <code>n</code> is the port number 0 - 7, <code>p</code> is the pin number 0 - 7,
+       and <code>l</code> is the logic level <code>HIGH</code> or <code>LOW</code>. The pin
+       mode must be set to <code>OUTPUT</code> before executing this command.
+    </p>
+    <p><code>PORT n GET PIN p</code></p>
+    <p>where <code>n</code> is the port number 0 - 7 and <code>p</code> is the pin
+       number 0 - 7. The pin mode must be set to <code>INPUT</code> before executing this
+       command.
+    </p>
+    <p><code>PORT n STROBE PIN p l</code></p>
+    <p>Strobe pin <code>p</code> of port <code>n</code> <code>HIGH</code> or <code>LOW</code>. The pin mode must be set
+       to <code>OUTPUT</code>, and the pin level <i>should</i> have a resting value opposite of <code>l</code>, before
+       executing this command, as it would make little sense to, e.g., strobe a pin <code>HIGH</code> if it's already
+       <code>HIGH</code>.
+    </p>
+    <p><code>PORT n SET MODE m</code></p>
+    <p>Set port <code>n</code> mode to <code>m</code>.
+    <p><code>PORT n GET MODE</code></p>
+    <p>Get port <code>n</code> mode.
+    <p><code>PORT n READ</code></p>
+    <p>Read a byte of data from port <code>n</code>. The port mode must be set to <code>INPUT</code>
+       before executing this command.
+    </p>
+    <p><code>PORT n WRITE d</code></p>
+    <p>Write a byte of data <code>d</code> (0 - 255) to port <code>n</code>. The port mode must
+       be set to <code>OUTPUT</code> before executing this command.
+    </p>
+    <p><code>ADC n SET GAIN g</code></p>
+    <p>Set amplifier gain of ADC channel <code>n</code> (0 - 15) to <code>g</code> (see
+       <a href="#adc_gain"><i>ADC Amplifier Gain Values</i></a>, below).
+    <p>
+    <!-- p><code>ADC n CLAMP s</code></p>
+    <p>Turn ADC channel <code>n</code> input clamp <code>ON</code> or <code>OFF</code>.</p -->
+    <p><code>ADC n READ</code></p>
+    <p>Read the input voltage of ADC channel <code>n</code>.</p>
+    <p><code>ADC n READ DIFF</code></p>
+    <p>Read the difference in input voltages between an even-numbered ADC channel <code>n</code> and channel <code>n + 1</code>,
+       or between an odd-numbered channel <code>n</code> and channel <code>n - 1</code>.
+    </p>
+    <p><code>DAC n WRITE v</code></p>
+    <p>Set the output voltage of DAC <code>n</code> (0 - 15) to <code>v</code> (0 - 5).</p>
+    <p><code>PWM SET FREQ f</code></p>
+    <p>Set the frequency of all sixteen PWM/servo pulse generators to <code>f</code> (40 - 1000).</p>
+    <p><code>PWM n SET DUTY CYCLE p</code></p>
+    <p>Set the duty cycle of PWM/servo pulse generator <code>n</code> to <code>p</code>, expressed as the
+       percentage (0 - 100) of the cycle where the level is <code>HIGH</code>.
+    </p>
+    <p><code>PWM n SET ANGLE a</code></p>
+    <p>Set the angle of rotation of a servo connected to channel <code>n</code> to <code>a</code> degrees (0 - 180).</p>
+    <p><code>CLOCK n SET FREQ f</code></p>
+    <p>Set the frequency of clock generator <code>n</code> (0 - 2) to <code>f</code> (4000 - 150000000).</p>
+    <p><code>WAVE SET FREQ f</code></p>
+    <p>Set the frequency of function generator to <code>f</code> (0 - 30000000).</p>
+    <a name="adc_gain" id="adc_gain"></a>
+    <h3>ADC Amplifier Gain Values</h3>
+    <p>There are six possible numeric values, each corresponding to a preset gain value:</p>
+    <ul>
+      <li>0 &mdash; two thirds (default)</li>
+      <li>1 &mdash; one</li>
+      <li>2 &mdash; two</li>
+      <li>4 &mdash; four</li>
+      <li>8 &mdash; eight</li>
+      <li>16 &mdash; sixteen</li>
+    </ul>
+  <h3>Sample Script</h3>
+  <p>The <code>ScriptEngine</code> class can execute a list of Droid commands in a file:</p>
+    <div class="cli">
+GO signalio
+DAC 0 WRITE 5
+DAC 1 WRITE 4.75
+DAC 2 WRITE 4.5
+DAC 3 WRITE 4.25
+DAC 4 WRITE 4
+DAC 5 WRITE 3.75
+DAC 6 WRITE 3.5
+DAC 7 WRITE 3.25
+DAC 8 WRITE 3
+DAC 9 WRITE 3.25
+DAC 10 WRITE 3.5
+DAC 11 WRITE 3.75
+DAC 12 WRITE 4
+DAC 13 WRITE 4.25
+DAC 14 WRITE 4.5
+DAC 15 WRITE 5
+QUIT
+    </div>
+  <h2>Example Application</h2>
+  <p>As mentioned earlier, I'm using a Raspberry Pi 3, two C.H.I.P.s, and an Arduino Nano in my setup. The Nano is
+     compatible with the ubiquitous Uno, and is small and cheap enough to permanently embed in an application. Thus,
+	 it's perfect for making Droids. You'd do well to keep a few on hand.
+  </p>
+  <p>The SBCs are powered from a USB power strip. The Raspberry Pi has the aforementioned HooToo USB hub attached.
+     Hard drives, terminal adapters, cameras, and Droids are attached to the hub. We'll start by running the whole
+	 application on the Raspberry Pi, then spread it out for a little WiFi fun.
+  </p>
+  <p>[Work in progress]
+  </p>
+  <h2>Conclusion</h2>
+  <p>I wrote the first version of the IoT framework in the latter half of 2016, and had successfully tested the DAC board
+     when the SD boot card in my Raspberry Pi crapped out during a DietPi upgrade, and I lost the only copy of all
+	 my code! That was what prompted me to set up a simple Samba-based NAS with nightly rsync backup, and to never store
+	 important stuff on an SD card again. I started over with a clean slate in summer of 2017, relearning all of the
+	 material I had forgotten over the preceding months, and started writing the current version. This version is
+	 much cleaner than the original. It does everything in a simpler, more straightforward way.
+  </p>
+  <p>That's the long and short of it, if not all the nuts 'n' bolts. In future articles, we'll explore in depth
+     how to create your own clients, servers, and Droids by extending the IoT framework's base classes. There will
+	 also be new Droids you can add to your network. Send me your questions, and I'll do a Q&A article as well.
+  </p>
+  <p>For those of you who reached this page from my r&eacute;sum&eacute; and got sidetracked reading all
+     of this: <i>don't forget that you're planning to hire me.</i>
+  </p>
+  <p>Have fun, and happy hacking!
+  </p>
+  <hr />
+  <p>The permanent home of this article is <a href="http://php-iot.madamebutterface.com">http://php-iot.madamebutterface.com</a>.
+  </p>
+  <p><i>Copyright &copy; 2017 James S. Elkins &lt;<a href="mailto:jselkins@yahoo.com">jselkins@yahoo.com</a>&gt;</p>
+  </p>
+ </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
